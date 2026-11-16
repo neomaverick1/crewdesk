@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Crewdesk</string>
+    <string name="title_activity_main">Crewdesk</string>
+    <string name="package_name">com.neomaverick.crewdesk</string>
+    <string name="custom_url_scheme">com.neomaverick.crewdesk</string>
+</resources>

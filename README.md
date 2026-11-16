@@ -4,6 +4,8 @@ Crewdesk runs a field service business: **jobs, dispatch, a crew calendar, custo
 
 **Live demo:** [neomaverick1.github.io/crewdesk](https://neomaverick1.github.io/crewdesk/). Sign in with one click as the owner, the dispatcher or a technician. The demo has no server: the real API and a real PostgreSQL database ([PGlite](https://pglite.dev), Postgres compiled to WebAssembly) start inside your browser tab, so you can create jobs, drag them around the calendar and send invoices, and your changes stay in your browser.
 
+**Phone apps:** [download Crewdesk.apk](https://neomaverick1.github.io/crewdesk/Crewdesk.apk) for Android (the whole demo, database included, runs on the phone). On iPhone, open the demo in Safari, tap Share, then **Add to Home Screen**. The Android and iOS projects are [Capacitor](https://capacitorjs.com) apps in [`android/`](android) and [`ios/`](ios).
+
 <img src="docs/screenshots/dashboard.jpg" alt="Dashboard with revenue, open jobs, crew workload and today's schedule" width="100%">
 
 <p>
@@ -19,7 +21,7 @@ Crewdesk runs a field service business: **jobs, dispatch, a crew calendar, custo
   <img src="docs/screenshots/technician-phone.jpg" width="24%" alt="A technician's day on a phone">
 </p>
 
-Every push to `main` type-checks, lints and tests the code (on PGlite and on a real PostgreSQL 17), then rebuilds and redeploys the live demo ([`.github/workflows/build.yml`](.github/workflows/build.yml)).
+Every push to `main` type-checks, lints and tests the code (on PGlite and on a real PostgreSQL 17), then rebuilds and redeploys the live demo, builds the Android APK, the Google Play bundle and the iOS app, and publishes a release ([`.github/workflows/build.yml`](.github/workflows/build.yml)).
 
 ## Features
 

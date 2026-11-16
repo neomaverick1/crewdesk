@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -56,9 +56,68 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/crewdesk
 
+  android:
+    name: Android app
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - name: Build the demo and copy it into the Android project
+        run: npm run android
+      - name: Build the APK and the Google Play bundle
+        working-directory: android
+        run: ./gradlew assembleRelease bundleRelease --no-daemon
+      - name: Sign them
+        env:
+          UPLOAD_JKS_B64: ${{ secrets.UPLOAD_JKS_B64 }}
+          UPLOAD_STORE_PASSWORD: ${{ secrets.UPLOAD_STORE_PASSWORD }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
+        run: bash .github/sign-android.sh android/app/build/outputs/apk/release/app-release-unsigned.apk Crewdesk.apk android/app/build/outputs/bundle/release/app-release.aab Crewdesk-Play.aab
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: |
+            Crewdesk.apk
+            Crewdesk-Play.aab
+
+  ios:
+    name: iOS app (simulator)
+    needs: checks
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build the demo and copy it into the iOS project
+        run: npm run ios
+      - name: Build the iOS app (simulator, unsigned)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -n 40
+          ditto -c -k --keepParent build/Build/Products/Release-iphonesimulator/App.app Crewdesk-iOS-Simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator
+          path: Crewdesk-iOS-Simulator.zip
+
   web:
     name: Build the live demo
-    needs: [checks, postgres]
+    needs: [checks, postgres, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,6 +127,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:demo
+      - uses: actions/download-artifact@v4
+        with:
+          name: android
+          path: app-download
+      - name: Put the APK and the Get the app button on the site
+        run: node .github/add-download.mjs dist app-download/Crewdesk.apk "Crewdesk" assets/icon-only.png /${{ github.event.repository.name }}/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
@@ -81,3 +146,29 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+
+  release:
+    if: always() && github.event_name == 'push' && needs.android.result == 'success'
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android
+          path: dist
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ios-simulator
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Crewdesk 1.0.${{ github.run_number }}
+          make_latest: true
+          files: dist/*
+          body: |
+            **Android:** download `Crewdesk.apk` and open it on your phone (allow installs from your browser). Also on the website's **Android app** button. The app runs the full demo, database included, on the phone.
+            **Google Play:** `Crewdesk-Play.aab` is the bundle for the Play Console.
+            **iPhone:** open https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/ in Safari, tap Share, then Add to Home Screen.
+            **iPhone simulator:** unzip `Crewdesk-iOS-Simulator.zip` and drag `App.app` onto a booted simulator.
